@@ -21,7 +21,56 @@
     const sendBtn = document.getElementById('send-btn');
     const imageInput = document.getElementById('image-input');
 
-    let chatHistory = []; // To store conversation history
+    let chatHistory = []; // To store current conversation history
+    let allChats = JSON.parse(localStorage.getItem('allChats')) || {}; // To store all chat sessions
+    let currentChatId = null; // To track the current chat session
+
+    const saveChat = () => {
+        if (chatHistory.length > 0) {
+            if (!currentChatId) {
+                currentChatId = `chat-${Date.now()}`;
+            }
+            allChats[currentChatId] = chatHistory;
+            localStorage.setItem('allChats', JSON.stringify(allChats));
+            renderPastChats();
+        }
+    };
+
+    const loadChat = (chatId) => {
+        currentChatId = chatId;
+        chatHistory = allChats[chatId] || [];
+        chatBox.innerHTML = ''; // Clear current display
+        chatHistory.forEach(entry => {
+            if (entry.role === 'user') {
+                appendMessage(entry.parts[0].text, 'user', false, entry.imageUrl);
+            } else if (entry.role === 'model') {
+                appendMessage(entry.parts[0].text, 'bot');
+            }
+        });
+        chatBox.scrollTop = chatBox.scrollHeight;
+    };
+
+    const renderPastChats = () => {
+        const pastChatsList = document.getElementById('past-chats-list');
+        pastChatsList.innerHTML = '';
+        Object.keys(allChats).forEach(chatId => {
+            const chatEntry = allChats[chatId];
+            if (chatEntry.length > 0) {
+                const firstMessage = chatEntry[0].parts[0].text.substring(0, 30) + '...'; // Display first 30 chars
+                const listItem = document.createElement('li');
+                listItem.textContent = firstMessage;
+                listItem.dataset.chatId = chatId;
+                listItem.addEventListener('click', () => loadChat(chatId));
+                pastChatsList.appendChild(listItem);
+            }
+        });
+    };
+
+    // Initial render of past chats on load
+    renderPastChats();
+
+    // Save chat before unload
+    window.addEventListener('beforeunload', saveChat);
 
     const fileToBase64 = (file) => {
         return new Promise((resolve, reject) => {
@@ -85,7 +134,7 @@
         const loadingMessageElement = appendMessage('...', 'bot', true);
 
         try {
-            const response = await fetch('https://gemini-chat-backend-8r6r.onrender.com', {
+            const response = await fetch('https://gemini-chat-backend-8r6r.onrender.com/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -102,6 +151,7 @@
 
             // Add bot response to history
             chatHistory.push({ role: 'model', parts: [{ text: data.response }] });
+            saveChat(); // Save chat after bot response
 
         } catch (error) {
             console.error('Error sending message:', error);
@@ -156,16 +206,32 @@
         }
     });
 
-    // Clear chat history button
-    const clearChatBtn = document.createElement('button');
-    clearChatBtn.textContent = 'Clear Chat';
-    clearChatBtn.id = 'clear-chat-btn';
-    clearChatBtn.classList.add('clear-chat-btn'); // Add a class for styling
-    document.querySelector('.chat-container').prepend(clearChatBtn); // Add to the top of chat container
-
-    clearChatBtn.addEventListener('click', () => {
+    // New Chat button functionality
+    const newChatBtn = document.getElementById('new-chat-btn');
+    newChatBtn.addEventListener('click', () => {
+        saveChat(); // Save current chat before starting a new one
         chatBox.innerHTML = ''; // Clear messages from display
         chatHistory = []; // Clear chat history array
+        currentChatId = null; // Reset current chat ID
     });
+
+    // Search in Chat functionality
+    const searchChatInput = document.getElementById('search-chat-input');
+    searchChatInput.addEventListener('input', () => {
+        const query = searchChatInput.value.toLowerCase();
+        const messages = chatBox.querySelectorAll('.message p');
+        messages.forEach(messageP => {
+            const originalText = messageP.dataset.originalText || messageP.textContent; // Store original text
+            messageP.dataset.originalText = originalText;
+
+            if (query && originalText.toLowerCase().includes(query)) {
+                const highlightedText = originalText.replace(new RegExp(query, 'gi'), match => `<span class="highlight">${match}</span>`);
+                messageP.innerHTML = highlightedText;
+            } else {
+                messageP.innerHTML = originalText;
+            }
+        });
+    });
+});
 });
 });
