@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingMessageElement = appendMessage('...', 'bot', true);
 
         try {
-            const response = await fetch('https://gemini-chat-backend-8r6r.onrender.com', {
+            const response = await fetch('https://gemini-chat-backend-8r6r.onrender.com/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
